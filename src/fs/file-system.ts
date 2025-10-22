@@ -1,7 +1,7 @@
 import path from 'path';
 import fs from 'fs/promises';
-import { config } from 'src/config';
-import { FileObject } from 'src/generated/prisma';
+import { config } from '../config.js';
+import { FileObject } from '../generated/prisma/index.js';
 
 export function joinPath(...parts: string[]) {
 	return path.join(...parts);

@@ -1,6 +1,5 @@
 import { Router } from 'express';
-import { createBucket } from 'src/bucket/bucket';
-import { RequestWithBucket } from 'src/types/req';
+import { RequestWithBucket } from '../types/req.js';
 
 // TODO: Make API routes secured by authentication
 

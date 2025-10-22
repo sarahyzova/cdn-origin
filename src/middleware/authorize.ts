@@ -1,6 +1,6 @@
 import { Response, NextFunction } from 'express';
-import { config } from '../config';
-import { RequestWithBucket } from 'src/types/req';
+import { config } from '../config.js';
+import { RequestWithBucket } from '../types/req.js';
 
 export async function authorizeMiddleware(
 	req: RequestWithBucket,

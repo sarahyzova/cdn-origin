@@ -1,5 +1,5 @@
-import { config } from './config';
-import { PrismaClient } from './generated/prisma';
+import { config } from './config.js';
+import { PrismaClient } from './generated/prisma/index.js';
 
 export const db = new PrismaClient().$extends({
 	result: {

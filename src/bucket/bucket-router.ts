@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { db } from 'src/db';
-import { deleteFile, getAdapter, joinPath } from 'src/fs/file-system';
-import { RequestWithBucket } from 'src/types/req';
 import { createWriteStream } from 'fs';
 import fs from 'fs/promises';
+import { RequestWithBucket } from '../types/req.js';
+import { db } from '../db.js';
+import { deleteFile, getAdapter, joinPath } from '../fs/file-system.js';
 
 const bucketRouter = Router();
 

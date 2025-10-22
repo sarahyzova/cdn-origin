@@ -1,4 +1,6 @@
+import chalk from 'chalk';
+
 export const logger = {
-	info: console.log,
-	error: console.error,
+	info: (...args: any[]) => console.log(chalk.blueBright('[INFO]'), ...args),
+	error: (...args: any[]) => console.log(chalk.redBright('[ERROR]'), ...args),
 };

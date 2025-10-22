@@ -1,8 +1,8 @@
-import { getBasePath, joinPath } from './fs/file-system';
+import { getBasePath, joinPath } from './fs/file-system.js';
 import fs from 'fs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import { config } from './config';
+import { config } from './config.js';
 
 let signatureKey: string | null = null;
 function getSecretKey() {

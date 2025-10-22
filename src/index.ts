@@ -1,11 +1,11 @@
 import Express from 'express';
-import { bucketMiddleware } from './middleware/bucket';
-import { config } from './config';
-import { apiRouter } from './api/api-router';
-import { bucketRouter } from './bucket/bucket-router';
-import { authorizeMiddleware } from './middleware/authorize';
-import { createBucket } from './bucket/bucket';
-import { fsKeypathAdapter } from './fs/file-system';
+import { bucketMiddleware } from './middleware/bucket.js';
+import { config } from './config.js';
+import { apiRouter } from './api/api-router.js';
+import { bucketRouter } from './bucket/bucket-router.js';
+import { authorizeMiddleware } from './middleware/authorize.js';
+import { logger } from './logger.js';
+import chalk from 'chalk';
 
 const app = Express();
 
@@ -19,5 +19,9 @@ app.use(apiRouter);
 app.use(bucketRouter);
 
 app.listen(config.PORT, () => {
-	console.log(`Server running on port ${config.PORT}`);
+	logger.info(
+		`Server running on port ${chalk.greenBright.bold.underline(
+			config.PORT,
+		)}`,
+	);
 });

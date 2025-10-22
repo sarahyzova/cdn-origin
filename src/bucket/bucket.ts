@@ -1,7 +1,7 @@
-import { db } from 'src/db';
-import { createBucketStorage, FsAdapter } from 'src/fs/file-system';
-import { bucketCriticalLimiter } from 'src/limiter';
-import { logger } from 'src/logger';
+import { db } from '../db.js';
+import { createBucketStorage, FsAdapter } from '../fs/file-system.js';
+import { bucketCriticalLimiter } from '../limiter.js';
+import { logger } from '../logger.js';
 
 export function isValidBucketName(name: string) {
 	const regex = /^[a-z0-9\-]{3,63}$/;

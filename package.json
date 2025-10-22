@@ -7,6 +7,7 @@
 	"scripts": {
 		"start": "node ./dist/index.js",
 		"build": "tsc",
+		"postbuild": "cp -rf src/generated/ dist/generated/",
 		"dev": "tsx --watch src/index.ts"
 	},
 	"dependencies": {

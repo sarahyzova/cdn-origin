@@ -1,0 +1,24 @@
+name: helkor-cnd-dev
+services:
+  db:
+    image: mariadb
+    ports:
+      - "3367:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: cdn
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+
+    volumes:
+      - ./tmp/dev_db_data:/var/lib/mysql
+  phpmyadmin:
+    image: phpmyadmin
+    ports:
+      - "8082:80"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      PMA_USER: root
+      PMA_PASSWORD: root
+    depends_on:
+      - db

@@ -1,0 +1,6 @@
+/dist/
+/node_modules/
+.env
+/tmp/
+/data/
+/src/generated/prisma

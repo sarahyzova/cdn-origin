@@ -1,0 +1,63 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Bucket {
+  name        String   @id
+  adapter     String   @default("blob")
+
+  createdAt   DateTime @map("created_at") @default(now())
+  updatedAt   DateTime @map("updated_at") @updatedAt
+  owner       String?
+  public      Boolean  @default(false)
+
+  fileObjects FileObject[]
+  @@map("buckets")
+}
+
+model FileObject {
+  id          String   @id @default(cuid())
+  bucketName  String   @map("bucket_name")
+  owner       String?
+
+  bucket      Bucket   @relation(fields: [bucketName], references: [name], onDelete: Cascade)
+  createdAt   DateTime @map("created_at") @default(now())
+  updatedAt   DateTime @map("updated_at") @updatedAt
+  size        Int
+  mimeType    String   @map("mime_type")
+  key         String   @db.VarChar(512)
+  parentId    String?  @map("parent_id")
+  checksum    String?
+  tags        ObjectTag[]
+
+  parent      FileObject?  @relation("ObjectToObject", fields: [parentId], references: [id], onDelete: Cascade)
+  children    FileObject[] @relation("ObjectToObject")
+
+  public      Boolean  @default(false)
+
+  @@unique([bucketName, key])
+  @@map("files")
+}
+
+model ObjectTag {
+  objectId    String  @map("object_id")
+  tag         String
+  unique      Boolean @default(false)
+
+  fileObject  FileObject  @relation(fields: [objectId], references: [id], onDelete: Cascade)
+
+  @@id([objectId, tag])
+  @@map("tags")
+}

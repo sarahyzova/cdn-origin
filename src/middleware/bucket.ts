@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { config } from '../config.js';
 import { RequestWithBucket } from '../types/req.js';
+import { logger } from '../logger.js';
 
 export async function bucketMiddleware(
 	req: RequestWithBucket,
@@ -16,6 +17,7 @@ export async function bucketMiddleware(
 
 	if (!host.endsWith(`.${config.DOMAIN_SUFFIX}`)) {
 		res.status(400).send('Invalid domain');
+		logger.warn(`Request with invalid domain: ${host}`);
 		return;
 	}
 

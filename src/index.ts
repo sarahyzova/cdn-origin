@@ -22,6 +22,6 @@ app.listen(config.PORT, () => {
 	logger.info(
 		`Server running on port ${chalk.greenBright.bold.underline(
 			config.PORT,
-		)}`,
+		)} on domain ${chalk.greenBright.bold.underline(config.DOMAIN_SUFFIX)}`,
 	);
 });

@@ -6,6 +6,7 @@
 	"license": "UNLICENSED",
 	"scripts": {
 		"start": "node ./dist/index.js",
+		"production": "pnpm prisma migrate deploy && node ./dist/index.js",
 		"build": "tsc",
 		"postbuild": "pnpm prisma generate && cp -rf src/generated/ dist/generated/",
 		"dev": "tsx --watch src/index.ts"

@@ -21,6 +21,11 @@ export async function bucketMiddleware(
 		return;
 	}
 
+	if (host === config.DOMAIN_SUFFIX) {
+		next();
+		return;
+	}
+
 	const bucketName = host.slice(0, -`.${config.DOMAIN_SUFFIX}`.length);
 
 	if (!bucketName) {

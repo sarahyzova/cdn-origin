@@ -11,7 +11,7 @@ export async function bucketMiddleware(
 	const host = req.hostname;
 
 	if (host === config.DOMAIN_SUFFIX) {
-		res.status(400).send('No bucket specified');
+		next();
 		return;
 	}
 
@@ -21,21 +21,12 @@ export async function bucketMiddleware(
 		return;
 	}
 
-	if (host === config.DOMAIN_SUFFIX) {
+	const bucketName = host.slice(0, -`.${config.DOMAIN_SUFFIX}`.length);
+	if (!bucketName) {
 		next();
 		return;
 	}
 
-	const bucketName = host.slice(0, -`.${config.DOMAIN_SUFFIX}`.length);
-
-	if (!bucketName) {
-		res.status(400).send('No bucket specified');
-		return;
-	}
-
-	if (bucketName !== config.API_ALIAS) {
-		req.bucketName = bucketName;
-	}
-
+	req.bucketName = bucketName;
 	next();
 }

@@ -6,19 +6,9 @@ Goal of this project is provide simple origin server for static files which can 
 
 This project is licensed under MIT license. See LICENSE file for details.
 
-## Features
+## Documentation
 
-This are list of implemented and planned features:
-
--   [x] Files are stored in buckets
--   [x] View ,upload and delete files via REST API
--   [x] Basic auth as root user
--   [ ] Generate pre-signed URLs for uploading and downloading files
--   [ ] Advanced authorization and authentication
--   [ ] Managing buckets via REST API
--   [ ] Docker image
--   [ ] Image resizing on the fly and on upload
--   [ ] Caching headers
+-   [API Documentation](./docs/api.md) - Authorization methods and available API endpoints.
 
 ## Contributing
 

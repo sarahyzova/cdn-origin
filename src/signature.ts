@@ -26,33 +26,34 @@ function generateSecretKey() {
 	return crypto.randomBytes(64).toString('hex');
 }
 
-export function createReadFileSignature(
+export function createFileSignature(
 	bucket: string,
+	action: 'read' | 'write',
 	fileKey: string,
-	expiresInSeconds: number,
+	expiresInSeconds: number = 3600,
 ) {
-	const key = getSecretKey();
+	const jwtSecret = getSecretKey();
 	const expireTime = Math.floor(Date.now() / 1000) + expiresInSeconds;
 	const jwtPayload = {
-		action: 'read',
+		action,
 		bucket,
 		key: fileKey,
 		exp: expireTime,
 	};
 
-	const token = jwt.sign(jwtPayload, key);
+	const token = jwt.sign(jwtPayload, jwtSecret);
 	return token;
 }
 
-export function verifyReadFileSignature(
+export function verifyFileSignature(
 	token: string,
 	bucket: string,
+	action: 'read' | 'write',
 	fileKey: string,
 ): boolean {
 	const key = getSecretKey();
 	try {
 		const verified = jwt.verify(token, key);
-		console.log(verified);
 
 		if (typeof verified === 'string') return false;
 
@@ -60,7 +61,7 @@ export function verifyReadFileSignature(
 		return (
 			verified.bucket === bucket &&
 			verified.key === fileKey &&
-			verified.action === 'read'
+			verified.action === action
 		);
 	} catch (err) {
 		return false;

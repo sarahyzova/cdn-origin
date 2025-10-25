@@ -206,8 +206,8 @@ bucketRouter.post('/*path', async (req: RequestWithBucket, res) => {
 		: 0;
 
 	if (isNaN(length) || length <= 0) {
-		res.status(400).send('Invalid Content-Length');
-		return;
+		// res.status(400).send('Invalid Content-Length');
+		// return;
 	}
 
 	const contentType =

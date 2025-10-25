@@ -28,7 +28,7 @@ To generate signed URL you need to append `signature` query parameter to the url
 	"action": "read",
 	"bucket": "BUCKET_NAME_HERE",
 	"key": "FILE_PATH_HERE",
-	"exp": 1700000000, // Unix timestamp when the signature expires
+	"exp": 1700000000,
 }
 ```
 
@@ -93,19 +93,14 @@ GET example.com/buckets/<bucket_name>
 **Authorization:** Root access required.  
 **Request:**
 
-```http
+```
 POST example.com/buckets/<bucket_name>
 ```
 
 ```json
 {
-	// blob or keypath (recommended: blob)
 	"adapter": "blob",
-
-	// Can be null or any string. Used for external purposes.
 	"owner": null,
-
-	// If true, all files in the bucket are public
 	"isPublic": false
 }
 ```
@@ -130,13 +125,13 @@ POST example.com/buckets/<bucket_name>
 **Authorization:** Root access required.  
 **Request:**
 
-```http
+```
 DELETE example.com/buckets/<bucket_name>
 ```
 
 **Example response:**
 
-```http
+```
 204 No Content
 ```
 
@@ -146,7 +141,7 @@ DELETE example.com/buckets/<bucket_name>
 **Authorization:** Root access required.
 **Request:**
 
-```http
+```
 POST <bucket_name>.example.com/<file_key>
 ```
 
@@ -170,13 +165,13 @@ POST <bucket_name>.example.com/<file_key>
 **Authorization:** Root access required.
 **Request:**
 
-```http
+```
 DELETE <bucket_name>.example.com/<file_key>
 ```
 
 **Example response:**
 
-```http
+```
 200 OK
 File deleted successfully
 ```
@@ -187,7 +182,7 @@ File deleted successfully
 **Authorization:** Root access required.
 **Request:**
 
-```http
+```
 GET <bucket_name>.example.com/~objects/<key_prefix>
 ```
 
@@ -212,7 +207,7 @@ GET <bucket_name>.example.com/~objects/<key_prefix>
 **Authorization:** When file or bucket is public, no authentication is required. For private files, either root access or a valid signed URL is required.  
 **Request:**
 
-```http
+```
 GET <bucket_name>.example.com/<file_key>
 ```
 
@@ -224,7 +219,7 @@ GET <bucket_name>.example.com/<file_key>
 **Authorization:** When file or bucket is public, no authentication is required. For private files, either root access or a valid signed URL is required.  
 **Request:**
 
-```http
+```
 GET <bucket_name>.example.com/~meta/<file_key>
 ```
 

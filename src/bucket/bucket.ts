@@ -1,4 +1,4 @@
-import { mkdir, rm } from 'fs/promises';
+import { mkdir, rm, stat } from 'fs/promises';
 import { db } from '../db.js';
 import {
 	createBucketStorage,
@@ -152,7 +152,22 @@ export function createObject(
 			await mkdir(dirPath, { recursive: true });
 
 			const writeStream = createWriteStream(realPath);
-			writeStream.on('finish', () => {
+			writeStream.on('finish', async () => {
+				if (options.size <= 0) {
+					const stats = await stat(realPath);
+					const size = stats.size;
+					const updatedFile = await db.fileObject.update({
+						where: {
+							id: file.id,
+						},
+						data: {
+							size: size,
+						},
+					});
+					resolve(updatedFile);
+					return;
+				}
+
 				resolve(file);
 			});
 

@@ -106,34 +106,84 @@ bucketRouter.get('/*path', async (req: RequestWithBucket, res) => {
 		return;
 	}
 
-	const fileObject = await db.fileObject.findUnique({
-		where: {
-			bucketName_key: {
-				bucketName: bucketName,
-				key: filePath,
+	const bucket = await db.bucket.findUnique({
+		where: { name: bucketName },
+		include: {
+			fileObjects: {
+				where: {
+					key: filePath,
+				},
+				include: {
+					parent: true,
+				},
 			},
 		},
-		include: { bucket: true, parent: true },
 	});
 
-	if (!fileObject) {
-		res.status(404).send('Object not found');
+	if (!bucket) {
+		res.status(404).send('Bucket not found');
 		return;
 	}
 
+	const fileAdapter = getAdapter(bucket.adapter);
+
+	let fileObject = bucket.fileObjects.find((fo) => fo.key === filePath);
+
+	if (!fileObject) {
+		if (!bucket.notFoundFallbackKey) {
+			res.status(404).send('Object not found');
+			return;
+		}
+
+		const fallbackObject = await db.fileObject.findUnique({
+			where: {
+				bucketName_key: {
+					bucketName: bucket.name,
+					key: bucket.notFoundFallbackKey,
+				},
+			},
+			include: { parent: true },
+		});
+
+		if (!fallbackObject) {
+			res.status(404).send('Object not found');
+			return;
+		}
+
+		fileObject = fallbackObject;
+	}
+
 	const isPublic =
-		fileObject.bucket.public ||
+		bucket.public ||
 		fileObject.public ||
 		fileObject.parent?.public ||
 		req.user === 'root' ||
 		false;
 
 	if (!isPublic) {
-		res.status(403).send('Object is not public');
-		return;
+		if (!bucket.accessDeniedFallbackKey) {
+			res.status(403).send('Object is not public');
+			return;
+		}
+
+		const fallbackObject = await db.fileObject.findUnique({
+			where: {
+				bucketName_key: {
+					bucketName: bucket.name,
+					key: bucket.accessDeniedFallbackKey,
+				},
+			},
+			include: { parent: true },
+		});
+
+		if (!fallbackObject) {
+			res.status(403).send('Object is not public');
+			return;
+		}
+
+		fileObject = fallbackObject;
 	}
 
-	const fileAdapter = getAdapter(fileObject.bucket.adapter);
 	const realPath = fileAdapter.getFilePath(fileObject);
 
 	res.status(200);
@@ -181,8 +231,83 @@ bucketRouter.delete('/*path', async (req: RequestWithBucket, res) => {
 
 // Empty page
 bucketRouter.get('/', async (req: RequestWithBucket, res) => {
-	res.status(400);
-	res.send('Object not specified');
+	const bucketName = req.bucketName;
+	const rawPath = req.params.path as any as string | string[];
+	const filePath = Array.isArray(rawPath) ? rawPath.join('/') : rawPath;
+
+	if (!bucketName) {
+		res.status(400).send('Bucket not specified');
+		return;
+	}
+
+	const bucket = await db.bucket.findUnique({
+		where: { name: bucketName },
+	});
+
+	if (!bucket) {
+		res.status(404).send('Bucket not found');
+		return;
+	}
+
+	const fileAdapter = getAdapter(bucket.adapter);
+
+	if (!bucket.indexKey) {
+		res.status(404).send('Object not found');
+		return;
+	}
+
+	let fileObject = await db.fileObject.findUnique({
+		where: {
+			bucketName_key: {
+				bucketName: bucket.name,
+				key: bucket.indexKey,
+			},
+		},
+		include: { parent: true },
+	});
+
+	if (!fileObject) {
+		res.status(404).send('Object not found');
+		return;
+	}
+
+	const isPublic =
+		bucket.public ||
+		fileObject.public ||
+		fileObject.parent?.public ||
+		req.user === 'root' ||
+		false;
+
+	if (!isPublic) {
+		if (!bucket.accessDeniedFallbackKey) {
+			res.status(403).send('Object is not public');
+			return;
+		}
+
+		const fallbackObject = await db.fileObject.findUnique({
+			where: {
+				bucketName_key: {
+					bucketName: bucket.name,
+					key: bucket.accessDeniedFallbackKey,
+				},
+			},
+			include: { parent: true },
+		});
+
+		if (!fallbackObject) {
+			res.status(403).send('Object is not public');
+			return;
+		}
+
+		fileObject = fallbackObject;
+	}
+
+	const realPath = fileAdapter.getFilePath(fileObject);
+
+	res.status(200);
+	res.header('Content-Type', fileObject.mimeType);
+	res.header('Content-Length', fileObject.size.toString());
+	res.sendFile(realPath);
 });
 
 // Upload

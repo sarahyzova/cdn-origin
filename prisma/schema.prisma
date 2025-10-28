@@ -23,6 +23,10 @@ model Bucket {
   owner       String?
   public      Boolean  @default(false)
 
+  indexKey                String?  @map("index_key")
+  notFoundFallbackKey     String?  @map("e404_fallback_key")
+  accessDeniedFallbackKey String?  @map("e403_fallback_key")
+
   fileObjects FileObject[]
   @@map("buckets")
 }

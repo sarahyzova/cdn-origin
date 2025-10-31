@@ -8,6 +8,7 @@ import { createObject, deleteObject } from './bucket.js';
 import { getFileUrl } from './bucket-url.js';
 import { parseParamWildcard } from '../utils/parse-wildcard.js';
 import { inDir } from '../fs/dir.js';
+import { verifyFileSignature } from '../signature.js';
 
 const bucketRouter = Router();
 
@@ -100,6 +101,7 @@ bucketRouter.get('/*path', async (req: RequestWithBucket, res) => {
 	const bucketName = req.bucketName;
 	const rawPath = req.params.path as any as string | string[];
 	const filePath = Array.isArray(rawPath) ? rawPath.join('/') : rawPath;
+	const { signature, exp } = req.query;
 
 	if (!bucketName) {
 		res.status(400).send('Bucket not specified');
@@ -153,12 +155,29 @@ bucketRouter.get('/*path', async (req: RequestWithBucket, res) => {
 		fileObject = fallbackObject;
 	}
 
+	const signatureStatus = !signature
+		? 'no-signature'
+		: verifyFileSignature(
+				`${signature}`,
+				bucket.name,
+				'read',
+				fileObject.key,
+		  )
+		? 'valid'
+		: 'invalid';
+
 	const isPublic =
 		bucket.public ||
 		fileObject.public ||
 		fileObject.parent?.public ||
 		req.user === 'root' ||
+		signatureStatus === 'valid' ||
 		false;
+
+	if (!isPublic && signatureStatus === 'invalid') {
+		res.status(403).send('Invalid signature');
+		return;
+	}
 
 	if (!isPublic) {
 		if (!bucket.accessDeniedFallbackKey) {

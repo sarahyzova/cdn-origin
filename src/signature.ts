@@ -3,6 +3,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { config } from './config.js';
+import { Actor } from './permissions/actor.js';
 
 let signatureKey: string | null = null;
 function getSecretKey() {
@@ -43,6 +44,57 @@ export function createFileSignature(
 
 	const token = jwt.sign(jwtPayload, jwtSecret);
 	return token;
+}
+
+export function actorFromSignature(token: string):
+	| {
+			valid: false;
+	  }
+	| {
+			valid: true;
+			actor: Actor;
+	  } {
+	const key = getSecretKey();
+	try {
+		const verified = jwt.verify(token, key);
+		if (typeof verified === 'string') {
+			return {
+				valid: false,
+			};
+		}
+
+		if (
+			typeof verified.bucket !== 'string' ||
+			typeof verified.key !== 'string' ||
+			typeof verified.action !== 'string'
+		) {
+			return {
+				valid: false,
+			};
+		}
+
+		if (!['read', 'write'].includes(verified.action)) {
+			return {
+				valid: false,
+			};
+		}
+
+		const actor: Actor = {
+			type: 'signature',
+			bucketId: verified.bucket,
+			fileKey: verified.key,
+			action: verified.action as 'read' | 'write',
+		};
+
+		return {
+			valid: true,
+			actor,
+		};
+	} catch (err) {
+		return {
+			valid: false,
+		};
+	}
 }
 
 export function verifyFileSignature(

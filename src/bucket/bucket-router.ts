@@ -9,6 +9,7 @@ import { getFileUrl } from './bucket-url.js';
 import { parseParamWildcard } from '../utils/parse-wildcard.js';
 import { inDir } from '../fs/dir.js';
 import { verifyFileSignature } from '../signature.js';
+import { checkPermissions } from '../permissions/check.js';
 
 const bucketRouter = Router();
 
@@ -44,9 +45,13 @@ bucketRouter.get('/~objects{/*path}', async (req: RequestWithBucket, res) => {
 		return;
 	}
 
-	const fileObjects = bucket.fileObjects;
+	const fileObjects = bucket.fileObjects.filter((fo) => inDir(path, fo.key));
 
-	const authorized = req.user === 'root';
+	const authorized = checkPermissions(req.actor, 'directory', 'list', {
+		bucketId: bucket.name,
+		path: path,
+	});
+
 	if (!authorized) {
 		res.status(403).send('Not authorized to list this bucket');
 		return;
@@ -81,15 +86,13 @@ bucketRouter.get('/~meta/*path', async (req: RequestWithBucket, res) => {
 		return;
 	}
 
-	const isPublic =
+	const authorized =
+		checkPermissions(req.actor, 'object', 'getMetadata', fileObject) ||
 		fileObject.bucket.public ||
-		fileObject.public ||
-		fileObject.parent?.public ||
-		req.user === 'root' ||
-		false;
+		fileObject.parent?.public;
 
-	if (!isPublic) {
-		res.status(403).send('Object is not public');
+	if (!authorized) {
+		res.status(403).send('Not authorized to view this object metadata');
 		return;
 	}
 
@@ -101,7 +104,6 @@ bucketRouter.get('/*path', async (req: RequestWithBucket, res) => {
 	const bucketName = req.bucketName;
 	const rawPath = req.params.path as any as string | string[];
 	const filePath = Array.isArray(rawPath) ? rawPath.join('/') : rawPath;
-	const { signature, exp } = req.query;
 
 	if (!bucketName) {
 		res.status(400).send('Bucket not specified');
@@ -128,7 +130,6 @@ bucketRouter.get('/*path', async (req: RequestWithBucket, res) => {
 	}
 
 	const fileAdapter = getAdapter(bucket.adapter);
-
 	let fileObject = bucket.fileObjects.find((fo) => fo.key === filePath);
 
 	if (!fileObject) {
@@ -155,33 +156,14 @@ bucketRouter.get('/*path', async (req: RequestWithBucket, res) => {
 		fileObject = fallbackObject;
 	}
 
-	const signatureStatus = !signature
-		? 'no-signature'
-		: verifyFileSignature(
-				`${signature}`,
-				bucket.name,
-				'read',
-				fileObject.key,
-		  )
-		? 'valid'
-		: 'invalid';
-
-	const isPublic =
+	const authorized =
+		checkPermissions(req.actor, 'object', 'get', fileObject) ||
 		bucket.public ||
-		fileObject.public ||
-		fileObject.parent?.public ||
-		req.user === 'root' ||
-		signatureStatus === 'valid' ||
-		false;
+		fileObject.parent?.public;
 
-	if (!isPublic && signatureStatus === 'invalid') {
-		res.status(403).send('Invalid signature');
-		return;
-	}
-
-	if (!isPublic) {
+	if (!authorized) {
 		if (!bucket.accessDeniedFallbackKey) {
-			res.status(403).send('Object is not public');
+			res.status(403).send('Not authorized to access this object');
 			return;
 		}
 
@@ -196,7 +178,7 @@ bucketRouter.get('/*path', async (req: RequestWithBucket, res) => {
 		});
 
 		if (!fallbackObject) {
-			res.status(403).send('Object is not public');
+			res.status(403).send('Not authorized to access this object');
 			return;
 		}
 
@@ -232,7 +214,12 @@ bucketRouter.delete('/*path', async (req: RequestWithBucket, res) => {
 		return;
 	}
 
-	const authorized = req.user === 'root';
+	const authorized = checkPermissions(
+		req.actor,
+		'object',
+		'delete',
+		fileObject,
+	);
 	if (!authorized) {
 		res.status(403).send('Not authorized to delete this object');
 		return;
@@ -290,14 +277,12 @@ bucketRouter.get('/', async (req: RequestWithBucket, res) => {
 		return;
 	}
 
-	const isPublic =
+	const authorized =
+		checkPermissions(req.actor, 'object', 'get', fileObject) ||
 		bucket.public ||
-		fileObject.public ||
-		fileObject.parent?.public ||
-		req.user === 'root' ||
-		false;
+		fileObject.parent?.public;
 
-	if (!isPublic) {
+	if (!authorized) {
 		if (!bucket.accessDeniedFallbackKey) {
 			res.status(403).send('Object is not public');
 			return;
@@ -334,7 +319,25 @@ bucketRouter.post('/*path', async (req: RequestWithBucket, res) => {
 	const bucketName = req.bucketName;
 	const filePath = parseParamWildcard(req.params.path);
 
-	const authorized = req.user === 'root';
+	if (!bucketName) {
+		res.status(400).send('Bucket not specified');
+		return;
+	}
+
+	const authorized = checkPermissions(req.actor, 'object', 'create', {
+		bucketName: bucketName,
+		key: filePath,
+		checksum: '',
+		mimeType: '',
+		size: 0,
+		public: false,
+		createdAt: new Date(),
+		updatedAt: new Date(),
+		id: '',
+		owner: '',
+		parentId: null,
+	});
+
 	if (!authorized) {
 		res.status(403).send('Not authorized to upload to this bucket');
 		return;

@@ -131,6 +131,19 @@ export function createObject(
 ): Promise<FileObject | null> {
 	return new Promise(async (resolve, reject) => {
 		try {
+			const existingFile = await db.fileObject.findUnique({
+				where: {
+					bucketName_key: {
+						bucketName: options.bucketName,
+						key: options.key,
+					},
+				},
+			});
+
+			if (existingFile) {
+				await deleteObject(existingFile.id);
+			}
+
 			const file = await db.fileObject.create({
 				data: {
 					bucketName: options.bucketName,

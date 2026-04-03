@@ -22,9 +22,10 @@ function normalizeForCompare(p: string) {
  * Works with non-existent paths by using pure string normalization.
  */
 export function inDir(dirPath: string, filePath: string) {
-	if (!dirPath || !filePath) return false;
+	if (!filePath) return false;
 
-	const dirNorm = normalizeForCompare(dirPath);
+	// Empty dirPath means root — treat it as '.' to match top-level files
+	const dirNorm = dirPath ? normalizeForCompare(dirPath) : '.';
 	const parent = normalizeForCompare(
 		path.posix.dirname(filePath.replace(/\\/g, '/')),
 	);

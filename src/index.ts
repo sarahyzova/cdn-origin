@@ -5,12 +5,16 @@ import { apiRouter } from './api/api-router.js';
 import { bucketRouter } from './bucket/bucket-router.js';
 import { authorizeMiddleware } from './middleware/authorize.js';
 import { logger } from './logger.js';
+import cors from 'cors';
 import chalk from 'chalk';
 
 const app = Express();
 
 app.set('trust proxy', true);
 app.disable('x-powered-by');
+
+app.use(cors());
+app.use(Express.static('public'));
 
 app.use(authorizeMiddleware);
 app.use(bucketMiddleware);

@@ -10,6 +10,7 @@ import { parseParamWildcard } from '../utils/parse-wildcard.js';
 import { inDir } from '../fs/dir.js';
 import { verifyFileSignature } from '../signature.js';
 import { checkPermissions } from '../permissions/check.js';
+import { isExpired, parseExpirationHeaders } from '../utils/expiration.js';
 
 const bucketRouter = Router();
 
@@ -45,7 +46,9 @@ bucketRouter.get('/~objects{/*path}', async (req: RequestWithBucket, res) => {
 		return;
 	}
 
-	const fileObjects = bucket.fileObjects.filter((fo) => inDir(path, fo.key));
+	const fileObjects = bucket.fileObjects.filter(
+		(fo) => inDir(path, fo.key) && !isExpired(fo),
+	);
 
 	const authorized = checkPermissions(req.actor, 'directory', 'list', {
 		bucketId: bucket.name,
@@ -81,7 +84,7 @@ bucketRouter.get('/~meta/*path', async (req: RequestWithBucket, res) => {
 		include: { bucket: true, parent: true, children: true },
 	});
 
-	if (!fileObject) {
+	if (!fileObject || isExpired(fileObject)) {
 		res.status(404).send('Object not found');
 		return;
 	}
@@ -132,7 +135,7 @@ bucketRouter.get('/*path', async (req: RequestWithBucket, res) => {
 	const fileAdapter = getAdapter(bucket.adapter);
 	let fileObject = bucket.fileObjects.find((fo) => fo.key === filePath);
 
-	if (!fileObject) {
+	if (!fileObject || isExpired(fileObject)) {
 		if (!bucket.notFoundFallbackKey) {
 			res.status(404).send('Object not found');
 			return;
@@ -272,7 +275,7 @@ bucketRouter.get('/', async (req: RequestWithBucket, res) => {
 		include: { parent: true },
 	});
 
-	if (!fileObject) {
+	if (!fileObject || isExpired(fileObject)) {
 		res.status(404).send('Object not found');
 		return;
 	}
@@ -336,6 +339,7 @@ bucketRouter.post('/*path', async (req: RequestWithBucket, res) => {
 		id: '',
 		owner: '',
 		parentId: null,
+		expiresAt: null,
 	});
 
 	if (!authorized) {
@@ -360,12 +364,19 @@ bucketRouter.post('/*path', async (req: RequestWithBucket, res) => {
 	const contentType =
 		req.headers['content-type'] || 'application/octet-stream';
 
+	const expiresAt = parseExpirationHeaders(req.headers);
+	if (expiresAt === 'invalid') {
+		res.status(400).send('Invalid expiration header');
+		return;
+	}
+
 	const file = await createObject({
 		bucketName: bucketName!,
 		key: filePath,
 		mimeType: contentType,
 		size: length,
 		public: false,
+		expiresAt,
 		data: req,
 	});
 
@@ -380,6 +391,7 @@ bucketRouter.post('/*path', async (req: RequestWithBucket, res) => {
 		mimeType: file.mimeType,
 		size: file.size,
 		public: file.public,
+		expiresAt: file.expiresAt,
 		url: getFileUrl(file.bucketName, file.key),
 	});
 });

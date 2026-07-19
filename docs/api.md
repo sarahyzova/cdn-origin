@@ -145,7 +145,15 @@ DELETE example.com/buckets/<bucket_name>
 POST <bucket_name>.example.com/<file_key>
 ```
 
-**Body**: Raw file data.  
+**Body**: Raw file data.
+
+**Optional headers:**
+
+-   `X-Expires-At`: An ISO 8601 timestamp. The file is automatically deleted once this time passes.
+-   `X-Expires-In`: Number of seconds from now after which the file is automatically deleted. Ignored if `X-Expires-At` is also set.
+
+Expired files are hidden immediately (treated as not found / excluded from directory listings) and are permanently removed from storage by a background cleanup job that runs roughly every minute.
+
 **Example response:**
 
 ```json
@@ -155,6 +163,7 @@ POST <bucket_name>.example.com/<file_key>
 	"mimeType": "image/png",
 	"size": 154689,
 	"public": false,
+	"expiresAt": null,
 	"url": "http://my-bucket.example.com/cute/cat.png"
 }
 ```

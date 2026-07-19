@@ -50,8 +50,10 @@ model FileObject {
   children    FileObject[] @relation("ObjectToObject")
 
   public      Boolean  @default(false)
+  expiresAt   DateTime? @map("expires_at")
 
   @@unique([bucketName, key])
+  @@index([expiresAt])
   @@map("files")
 }
 

@@ -83,6 +83,27 @@ export async function deleteBucket(bucketName: string) {
 	return true;
 }
 
+export async function deleteExpiredObjects() {
+	const expiredObjects = await db.fileObject.findMany({
+		where: {
+			expiresAt: {
+				lte: new Date(),
+			},
+		},
+		select: { id: true },
+	});
+
+	for (const { id } of expiredObjects) {
+		await deleteObject(id);
+	}
+
+	if (expiredObjects.length > 0) {
+		logger.info(`Deleted ${expiredObjects.length} expired object(s)`);
+	}
+
+	return expiredObjects.length;
+}
+
 export async function deleteObject(objectId: string) {
 	const fileToDelete = await db.fileObject.findUnique({
 		where: {
@@ -124,6 +145,7 @@ type CreateObjectOptions = {
 	size: number;
 	mimeType: string;
 	public?: boolean;
+	expiresAt?: Date | null;
 	data: Stream;
 };
 export function createObject(
@@ -151,6 +173,7 @@ export function createObject(
 					size: options.size,
 					mimeType: options.mimeType,
 					public: false,
+					expiresAt: options.expiresAt ?? null,
 				},
 				include: { bucket: true },
 			});

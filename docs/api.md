@@ -1,5 +1,37 @@
 # CDN Origin API
 
+## Caching
+
+Every file response carries an explicit `Cache-Control` so a CDN edge only ever caches
+responses that are safe to share with other visitors:
+
+-   Objects readable by anyone (public bucket, public object, or a public parent) get
+    `Cache-Control: public, max-age=<PUBLIC_CACHE_MAX_AGE_SECONDS>`.
+-   Anything only readable because of a root token or a signed URL gets
+    `Cache-Control: private, no-store`, so it is never cached at the edge — the origin's
+    authorization check always runs.
+-   Metadata (`~meta`) and directory listing (`~objects`) responses are always `no-store`.
+
+Deleting or overwriting a public object automatically purges it from Cloudflare's edge cache
+if `CLOUDFLARE_ZONE_ID` / `CLOUDFLARE_API_TOKEN` are configured — otherwise stale content
+would keep being served from the edge until `PUBLIC_CACHE_MAX_AGE_SECONDS` expires.
+
+## Main page redirect
+
+The bare CDN domain (e.g. `https://example.com/`, as opposed to a bucket subdomain) has no
+content of its own. Set `MAIN_PAGE_REDIRECT_URL` to redirect visitors who land there to
+somewhere useful (your main site, docs, etc). Without it, `/` on the bare domain returns a
+plain 404. Bucket subdomains are unaffected — they keep serving their own `indexKey` page.
+
+## Origin protection
+
+This server is meant to sit behind Cloudflare, not be reachable directly — direct access
+bypasses Cloudflare's caching, WAF, and rate limiting entirely. Set `ORIGIN_SHARED_SECRET`
+and configure a Cloudflare Transform Rule (or Worker) that adds a matching `X-Origin-Secret`
+header to every request forwarded to this origin; requests without it are rejected with 403.
+`/healthz` is exempt so infrastructure health checks (which don't go through Cloudflare) keep
+working.
+
 ## Authentication
 
 Public files and files within public buckets can be accessed without authentication.  
@@ -113,6 +145,44 @@ POST example.com/buckets/<bucket_name>
 	"adapter": "blob",
 	"owner": null,
 	"public": true,
+	"url": "https://my-first-bucket.example.com",
+	"createdAt": "2025-10-24T19:36:39.278Z",
+	"updatedAt": "2025-10-24T19:36:39.278Z"
+}
+```
+
+### Update bucket
+
+**Summary**: Updates a bucket's visibility and index/fallback keys.
+**Authorization:** Root access, or a bucket actor matching the bucket name.
+**Request:**
+
+```
+PATCH example.com/buckets/<bucket_name>
+```
+
+```json
+{
+	"isPublic": true,
+	"indexKey": "index.html",
+	"notFoundFallbackKey": "404.html",
+	"accessDeniedFallbackKey": "403.html"
+}
+```
+
+All fields are optional; omitted fields are left unchanged. Pass `null` for a fallback/index key to clear it.
+
+**Example response:**
+
+```json
+{
+	"name": "my-first-bucket",
+	"adapter": "blob",
+	"owner": null,
+	"public": true,
+	"indexKey": "index.html",
+	"notFoundFallbackKey": "404.html",
+	"accessDeniedFallbackKey": "403.html",
 	"url": "https://my-first-bucket.example.com",
 	"createdAt": "2025-10-24T19:36:39.278Z",
 	"updatedAt": "2025-10-24T19:36:39.278Z"

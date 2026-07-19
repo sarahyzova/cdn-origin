@@ -80,6 +80,47 @@ apiRouter.delete('/buckets/:bucketId', async (req: RequestWithBucket, res) => {
 	res.status(204).send();
 });
 
+apiRouter.patch('/buckets/:bucketId', async (req: RequestWithBucket, res) => {
+	const bucket = await db.bucket.findUnique({
+		where: { name: req.params.bucketId },
+	});
+
+	if (!bucket) {
+		res.status(404).send();
+		return;
+	}
+
+	const authorized = checkPermissions(req.actor, 'bucket', 'update', bucket);
+	if (!authorized) {
+		res.status(403).send();
+		return;
+	}
+
+	const { isPublic, indexKey, notFoundFallbackKey, accessDeniedFallbackKey } =
+		req.body as {
+			isPublic?: boolean;
+			indexKey?: string | null;
+			notFoundFallbackKey?: string | null;
+			accessDeniedFallbackKey?: string | null;
+		};
+
+	const updated = await db.bucket.update({
+		where: { name: bucket.name },
+		data: {
+			public: typeof isPublic === 'boolean' ? isPublic : undefined,
+			indexKey: indexKey === undefined ? undefined : indexKey,
+			notFoundFallbackKey:
+				notFoundFallbackKey === undefined ? undefined : notFoundFallbackKey,
+			accessDeniedFallbackKey:
+				accessDeniedFallbackKey === undefined
+					? undefined
+					: accessDeniedFallbackKey,
+		},
+	});
+
+	res.status(200).json(updated);
+});
+
 apiRouter.post('/buckets/:bucketId', async (req: RequestWithBucket, res) => {
 	const { bucketId } = req.params;
 	const { adapter = 'blob', owner = 'system', isPublic = false } = req.body;

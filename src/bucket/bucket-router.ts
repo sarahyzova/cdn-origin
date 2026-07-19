@@ -1,16 +1,19 @@
 import { Router } from 'express';
-import { createWriteStream } from 'fs';
-import fs from 'fs/promises';
+import cors from 'cors';
 import { RequestWithBucket } from '../types/req.js';
 import { db } from '../db.js';
-import { deleteFile, getAdapter, joinPath } from '../fs/file-system.js';
+import { getAdapter } from '../fs/file-system.js';
 import { createObject, deleteObject } from './bucket.js';
 import { getFileUrl } from './bucket-url.js';
 import { parseParamWildcard } from '../utils/parse-wildcard.js';
 import { inDir } from '../fs/dir.js';
-import { verifyFileSignature } from '../signature.js';
 import { checkPermissions } from '../permissions/check.js';
 import { isExpired, parseExpirationHeaders } from '../utils/expiration.js';
+import {
+	setNoStoreCacheHeaders,
+	setObjectCacheHeaders,
+} from '../utils/cache-headers.js';
+import { config } from '../config.js';
 
 const bucketRouter = Router();
 
@@ -20,6 +23,17 @@ bucketRouter.use((req: RequestWithBucket, res, next) => {
 		return;
 	}
 	next('router');
+});
+
+// File-serving routes are meant to be embedded/linked cross-origin (images, downloads, etc.),
+// so CORS is open here. The admin API (api-router.ts) intentionally does NOT get this.
+bucketRouter.use(cors());
+
+// Uploaded content is served back with a client-supplied Content-Type; without this header a
+// browser could sniff an uploaded file as HTML/JS and execute it in this bucket's origin.
+bucketRouter.use((req, res, next) => {
+	res.header('X-Content-Type-Options', 'nosniff');
+	next();
 });
 
 // List directory
@@ -60,6 +74,7 @@ bucketRouter.get('/~objects{/*path}', async (req: RequestWithBucket, res) => {
 		return;
 	}
 
+	setNoStoreCacheHeaders(res);
 	res.status(200).json(fileObjects);
 });
 
@@ -99,6 +114,7 @@ bucketRouter.get('/~meta/*path', async (req: RequestWithBucket, res) => {
 		return;
 	}
 
+	setNoStoreCacheHeaders(res);
 	res.status(200).json(fileObject);
 });
 
@@ -187,6 +203,11 @@ bucketRouter.get('/*path', async (req: RequestWithBucket, res) => {
 
 		fileObject = fallbackObject;
 	}
+
+	// Cacheability must reflect why this object could be read at all, never who asked for it:
+	// a response is only safe for a shared CDN cache to reuse if it would be readable by anyone.
+	const isPublicAccess = bucket.public || fileObject.public || !!fileObject.parent?.public;
+	setObjectCacheHeaders(res, isPublicAccess);
 
 	const realPath = fileAdapter.getFilePath(fileObject);
 
@@ -309,6 +330,9 @@ bucketRouter.get('/', async (req: RequestWithBucket, res) => {
 		fileObject = fallbackObject;
 	}
 
+	const isPublicAccess = bucket.public || fileObject.public || !!fileObject.parent?.public;
+	setObjectCacheHeaders(res, isPublicAccess);
+
 	const realPath = fileAdapter.getFilePath(fileObject);
 
 	res.status(200);
@@ -348,7 +372,7 @@ bucketRouter.post('/*path', async (req: RequestWithBucket, res) => {
 	}
 
 	if (filePath.startsWith('~')) {
-		res.sendStatus(404).send("Key can't start with ~");
+		res.status(404).send("Key can't start with ~");
 		return;
 	}
 
@@ -356,9 +380,13 @@ bucketRouter.post('/*path', async (req: RequestWithBucket, res) => {
 		? parseInt(req.headers['content-length'], 10)
 		: 0;
 
-	if (isNaN(length) || length <= 0) {
-		// res.status(400).send('Invalid Content-Length');
-		// return;
+	if (
+		config.MAX_UPLOAD_SIZE_BYTES &&
+		length > 0 &&
+		length > config.MAX_UPLOAD_SIZE_BYTES
+	) {
+		res.status(413).send('File exceeds maximum upload size');
+		return;
 	}
 
 	const contentType =
@@ -378,7 +406,13 @@ bucketRouter.post('/*path', async (req: RequestWithBucket, res) => {
 		public: false,
 		expiresAt,
 		data: req,
+		maxSize: config.MAX_UPLOAD_SIZE_BYTES,
 	});
+
+	if (file === 'too_large') {
+		res.status(413).send('File exceeds maximum upload size');
+		return;
+	}
 
 	if (!file) {
 		res.status(500).send('Failed to upload file');

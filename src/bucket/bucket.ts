@@ -1,4 +1,4 @@
-import { mkdir, rm, stat } from 'fs/promises';
+import { mkdir, rm, stat, unlink } from 'fs/promises';
 import { db } from '../db.js';
 import {
 	createBucketStorage,
@@ -13,6 +13,8 @@ import { createWriteStream } from 'fs';
 import { FileObject } from '../generated/prisma/index.js';
 import Stream from 'stream';
 import { config } from '../config.js';
+import { getFileUrl } from './bucket-url.js';
+import { purgeCloudflareCache } from '../integrations/cloudflare.js';
 
 export function isValidBucketName(name: string) {
 	const regex = /^[a-z0-9\-]{3,63}$/;
@@ -133,6 +135,17 @@ export async function deleteObject(objectId: string) {
 
 	const success = !!deletions[deletions.length - 1];
 
+	if (success) {
+		// Only files that could have been served to an anonymous caller could ever have been
+		// cached at the edge (see setObjectCacheHeaders) — no point purging private objects.
+		const purgeableObjects = [fileToDelete, ...fileToDelete.children].filter(
+			(object) => fileToDelete.bucket.public || object.public,
+		);
+		await purgeCloudflareCache(
+			purgeableObjects.map((object) => getFileUrl(object.bucketName, object.key)),
+		);
+	}
+
 	if (fileToDelete.parentId) {
 		return await deleteObject(fileToDelete.parentId);
 	}
@@ -147,11 +160,13 @@ type CreateObjectOptions = {
 	public?: boolean;
 	expiresAt?: Date | null;
 	data: Stream;
+	// Declared Content-Length can lie or be absent; this caps the actual bytes written to disk.
+	maxSize?: number | null;
 };
 export function createObject(
 	options: CreateObjectOptions,
-): Promise<FileObject | null> {
-	return new Promise(async (resolve, reject) => {
+): Promise<FileObject | null | 'too_large'> {
+	return new Promise(async (resolve) => {
 		try {
 			const existingFile = await db.fileObject.findUnique({
 				where: {
@@ -188,7 +203,30 @@ export function createObject(
 			await mkdir(dirPath, { recursive: true });
 
 			const writeStream = createWriteStream(realPath);
+			let settled = false;
+			let bytesReceived = 0;
+
+			if (options.maxSize) {
+				options.data.on('data', (chunk: Buffer) => {
+					if (settled || bytesReceived > options.maxSize!) return;
+					bytesReceived += chunk.length;
+					if (bytesReceived > options.maxSize!) {
+						settled = true;
+						writeStream.destroy();
+						unlink(realPath)
+							.catch(() => {})
+							.finally(() =>
+								db.fileObject.delete({ where: { id: file.id } }).catch(() => {}),
+							);
+						resolve('too_large');
+					}
+				});
+			}
+
 			writeStream.on('finish', async () => {
+				if (settled) return;
+				settled = true;
+
 				if (options.size <= 0) {
 					const stats = await stat(realPath);
 					const size = stats.size;
@@ -207,7 +245,9 @@ export function createObject(
 				resolve(file);
 			});
 
-			writeStream.on('error', (err) => {
+			writeStream.on('error', () => {
+				if (settled) return;
+				settled = true;
 				resolve(null);
 			});
 			options.data.pipe(writeStream);
